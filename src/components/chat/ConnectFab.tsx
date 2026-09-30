@@ -187,10 +187,7 @@ function ConnectPanel({ onClose }: { onClose: () => void }) {
               external
             />
           </div>
-          <p className="text-[11px] leading-relaxed text-white/35">
-            Messages open your email or WhatsApp client for now. A backend API hook can replace{" "}
-            <code className="text-white/50">sendPortfolioMessage</code> later.
-          </p>
+          
         </div>
       </motion.aside>
     </>

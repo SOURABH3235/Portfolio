@@ -20,7 +20,7 @@ export function ExperienceSection() {
         <SectionHeading
           eyebrow="Journey"
           title="Experience & achievements"
-          description="Editable timeline — add new entries in src/data/experience.ts and they appear here automatically."
+         
         />
         <div className="relative mx-auto max-w-3xl">
           <div className="absolute bottom-0 left-[11px] top-2 w-px bg-gradient-to-b from-accent via-white/20 to-transparent md:left-1/2 md:-translate-x-px" />

@@ -1,15 +1,15 @@
 export const siteConfig = {
   name: "Sourabh Rajput",
   displayName: "SOURABH RAJPUT",
-  title: "Sourabh Rajput | Full Stack & AI/ML Developer",
+  title: "Sourabh Rajput | Full Stack & AI/ML ",
   description:
     "Cinematic portfolio of Sourabh Rajput — B.Tech CSE-AIML student, Full Stack Developer and AI/ML Developer building thoughtful digital products.",
   subtitle: "CSE-AIML | Full Stack Developer | AI/ML",
-  role: "Full Stack Developer + AI/ML Developer",
+  role: "Full Stack Developer + Java/Spring Boot Developer",
   location: "Bhopal, Madhya Pradesh",
   tagline: "Let's build something amazing together.",
   summary:
-    "B.Tech Computer Science (AI & ML) student with hands-on experience in Java, Python, React.js, Spring Boot, Node.js and REST APIs. Building practical projects across carbon-credit, collaborative development and smart-agriculture domains — with a focus on reliable, user-focused software.",
+    "B.Tech Computer Science (AI & ML) student with hands-on experience in Java, Python, React.js, Spring Boot, Spring Web, Docker and REST APIs. Building practical projects across carbon-credit, collaborative development and smart-agriculture domains — with a focus on reliable, user-focused software.",
   educationShort: "B.Tech CSE-AIML · LNCT Bhopal",
   currentFocus: [
     "Full-stack product development with modern web stacks",
@@ -23,9 +23,9 @@ export const siteConfig = {
     "Performance-minded frontend craft and 3D web experiences",
   ],
   resume: {
-    viewUrl: "/Sourabh_Rajput_Resume.pdf",
-    downloadUrl: "/Sourabh_Rajput_Resume.pdf",
-    fileName: "Sourabh_Rajput_Resume.pdf",
+    viewUrl: "/Sourabh_Rajput_Resume_Modern - Google Docs.pdf",
+    downloadUrl: "/Sourabh_Rajput_Resume_Modern - Google Docs.pdf",
+    fileName: "Sourabh_Rajput_Resume_Modern - Google Docs.pdf",
   },
   nav: [
     { label: "About", href: "#about" },

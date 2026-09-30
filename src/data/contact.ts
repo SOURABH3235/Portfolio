@@ -18,7 +18,7 @@ export const contactConfig = {
     {
       id: "linkedin",
       label: "LinkedIn",
-      href: "https://www.linkedin.com/in/sourabh-rajput",
+      href: "https://www.linkedin.com/in/sourabhr295/",
       handle: "sourabh-rajput",
     },
     {

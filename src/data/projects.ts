@@ -40,8 +40,8 @@ export const projects: Project[] = [
     tech: [
       "React.js",
       "Tailwind CSS",
-      "Node.js",
-      "Express.js",
+      "Spring Boot",
+      "Spring Security",
       "MongoDB",
       "JWT",
       "Socket.io",

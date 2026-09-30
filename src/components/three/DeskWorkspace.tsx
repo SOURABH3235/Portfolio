@@ -1,106 +1,209 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { RoundedBox, Text } from "@react-three/drei";
+import { RoundedBox, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 
-function Monitor({ progress }: { progress: number }) {
-  const glow = useRef<THREE.Mesh>(null);
-  useFrame(({ clock }) => {
-    if (glow.current) {
-      const mat = glow.current.material as THREE.MeshStandardMaterial;
-      mat.emissiveIntensity = 1.4 + Math.sin(clock.elapsedTime * 1.6) * 0.25;
+type RevealProgress = { current: number };
+type PortraitPosition = { current: THREE.Vector3 };
+
+const portraitVertexShader = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const portraitFragmentShader = `
+  uniform sampler2D uMap;
+  uniform float uReveal;
+  varying vec2 vUv;
+  void main() {
+    vec4 portrait = texture2D(uMap, vUv);
+    float scan = 1.0 - uReveal;
+    float revealMask = smoothstep(scan - 0.025, scan + 0.025, vUv.y);
+    float revealFade = smoothstep(0.0, 0.12, uReveal);
+    gl_FragColor = vec4(portrait.rgb, portrait.a * revealMask * revealFade);
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }
+`;
+
+function PortraitReveal({
+  introDone,
+  reduced,
+  revealProgressRef,
+  portraitPositionRef,
+}: {
+  introDone: boolean;
+  reduced: boolean;
+  revealProgressRef: RevealProgress;
+  portraitPositionRef: PortraitPosition;
+}) {
+  const texture = useTexture("/my%20face.png");
+  const portrait = useRef<THREE.Group>(null);
+  const material = useRef<THREE.ShaderMaterial>(null);
+  const scanLine = useRef<THREE.Mesh>(null);
+  const scanMaterial = useRef<THREE.MeshBasicMaterial>(null);
+  const imageSize = useMemo(() => {
+    const image = texture.image as { width: number; height: number };
+    const aspect = image.width / image.height;
+    const height = Math.min(1.14, 0.88 / aspect);
+    return { width: height * aspect, height };
+  }, [texture]);
+  const geometryArgs = useMemo(
+    () => [imageSize.width, imageSize.height] as [number, number],
+    [imageSize],
+  );
+  const uniforms = useMemo(
+    () => ({
+      uMap: { value: texture },
+      uReveal: { value: 0 },
+    }),
+    [texture],
+  );
+
+  useEffect(() => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+  }, [texture]);
+
+  useFrame(() => {
+    if (portrait.current) {
+      portrait.current.getWorldPosition(portraitPositionRef.current);
+    }
+    const sequence = introDone ? revealProgressRef.current : 0;
+    const reveal = reduced
+      ? 1
+      : THREE.MathUtils.smoothstep(sequence, 0.34, 0.83);
+    if (material.current) material.current.uniforms.uReveal.value = reveal;
+
+    if (scanLine.current && scanMaterial.current) {
+      scanLine.current.position.y = (0.5 - reveal) * imageSize.height;
+      scanMaterial.current.opacity = reduced
+        ? 0
+        : 0.42 *
+          THREE.MathUtils.smoothstep(sequence, 0.3, 0.4) *
+          (1 - THREE.MathUtils.smoothstep(sequence, 0.78, 0.94));
     }
   });
 
   return (
-    <group position={[0, 1.15, -0.35]}>
-      {/* Bezel */}
-      <RoundedBox args={[2.4, 1.45, 0.08]} radius={0.04} smoothness={4}>
-        <meshStandardMaterial color="#0a0a0a" metalness={0.7} roughness={0.35} />
-      </RoundedBox>
-      {/* Screen */}
-      <mesh position={[0, 0, 0.045]}>
-        <planeGeometry args={[2.2, 1.28]} />
-        <meshStandardMaterial
-          color="#f5f5f5"
-          emissive="#ffffff"
-          emissiveIntensity={0.35 + progress * 0.4}
-          roughness={0.2}
-        />
-      </mesh>
-      {/* Character desk vignette on screen */}
-      <mesh position={[0, -0.12, 0.05]}>
-        <circleGeometry args={[0.28, 32]} />
-        <meshStandardMaterial color="#1a1020" emissive="#3b1d5c" emissiveIntensity={0.6} />
-      </mesh>
-      <mesh position={[0.02, -0.02, 0.055]}>
-        <capsuleGeometry args={[0.08, 0.14, 4, 8]} />
-        <meshStandardMaterial color="#111111" />
-      </mesh>
-      <mesh position={[0.02, 0.14, 0.055]}>
-        <sphereGeometry args={[0.07, 16, 16]} />
-        <meshStandardMaterial color="#f0c8a8" />
-      </mesh>
-      <mesh position={[0.02, 0.2, 0.055]}>
-        <cylinderGeometry args={[0.08, 0.08, 0.05, 16]} />
-        <meshStandardMaterial color="#6d28d9" />
-      </mesh>
-      <Text
-        position={[0.78, -0.42, 0.06]}
-        fontSize={0.2}
-        color="#111111"
-        anchorX="right"
-        anchorY="middle"
-      >
-        {`${Math.round(progress * 100)}%`}
-      </Text>
-      {/* Stand */}
-      <mesh position={[0, -0.85, 0.05]}>
-        <cylinderGeometry args={[0.05, 0.08, 0.35, 16]} />
-        <meshStandardMaterial color="#171717" metalness={0.8} roughness={0.3} />
-      </mesh>
-      <mesh position={[0, -1.05, 0.08]} rotation={[-Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.28, 0.28, 0.04, 32]} />
-        <meshStandardMaterial color="#111111" metalness={0.7} roughness={0.4} />
-      </mesh>
-      {/* Light bar */}
-      <mesh position={[0, 0.78, 0.06]}>
-        <boxGeometry args={[1.6, 0.04, 0.06]} />
-        <meshStandardMaterial
-          color="#f8fafc"
-          emissive="#fff7ed"
-          emissiveIntensity={1.2}
-        />
-      </mesh>
-      {/* Red sunset glow disc behind monitor */}
-      <mesh ref={glow} position={[0, 0.1, -0.55]}>
-        <circleGeometry args={[1.35, 48]} />
-        <meshStandardMaterial
-          color="#ff1f1f"
-          emissive="#ff1f1f"
-          emissiveIntensity={1.6}
+    <group ref={portrait} position={[0, -0.04, 0.06]}>
+      <mesh>
+        <planeGeometry args={geometryArgs} />
+        <shaderMaterial
+          ref={material}
+          uniforms={uniforms}
+          vertexShader={portraitVertexShader}
+          fragmentShader={portraitFragmentShader}
           transparent
-          opacity={0.85}
+          depthWrite={false}
           side={THREE.DoubleSide}
+          toneMapped={false}
         />
       </mesh>
-      <mesh position={[0, 0.1, -0.58]}>
-        <circleGeometry args={[1.9, 48]} />
-        <meshStandardMaterial
-          color="#7f1d1d"
-          emissive="#991b1b"
-          emissiveIntensity={0.7}
+      <mesh ref={scanLine} position={[0, imageSize.height / 2, 0.008]}>
+        <planeGeometry args={[imageSize.width * 1.08, 0.012]} />
+        <meshBasicMaterial
+          ref={scanMaterial}
+          color="#ff3a32"
           transparent
-          opacity={0.35}
-          side={THREE.DoubleSide}
+          opacity={0}
+          depthTest={false}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
         />
       </mesh>
     </group>
   );
 }
 
+function Monitor({
+    progress,
+    introDone,
+    reduced,
+    revealProgressRef,
+    portraitPositionRef,
+  }: {
+    progress: number;
+    introDone: boolean;
+    reduced: boolean;
+    revealProgressRef: RevealProgress;
+    portraitPositionRef: PortraitPosition;
+  }) {
+    const glow = useRef<THREE.Mesh>(null);
+    useFrame(({ clock }) => {
+      if (glow.current) {
+        const mat = glow.current.material as THREE.MeshStandardMaterial;
+        mat.emissiveIntensity = 1.4 + Math.sin(clock.elapsedTime * 1.6) * 0.25;
+      }
+    });
+
+    return (
+      <group position={[0, 1.15, -0.35]}>
+        <RoundedBox args={[2.4, 1.45, 0.08]} radius={0.04} smoothness={4}>
+          <meshStandardMaterial color="#0a0a0a" metalness={0.7} roughness={0.35} />
+        </RoundedBox>
+        <mesh position={[0, 0, 0.045]}>
+          <planeGeometry args={[2.2, 1.28]} />
+          <meshStandardMaterial
+            color="#f5f5f5"
+            emissive="#ffffff"
+            emissiveIntensity={0.35 + progress * 0.4}
+            roughness={0.2}
+          />
+        </mesh>
+        <PortraitReveal
+          introDone={introDone}
+          reduced={reduced}
+          revealProgressRef={revealProgressRef}
+          portraitPositionRef={portraitPositionRef}
+        />
+        <mesh position={[0, -0.85, 0.05]}>
+          <cylinderGeometry args={[0.05, 0.08, 0.35, 16]} />
+          <meshStandardMaterial color="#171717" metalness={0.8} roughness={0.3} />
+        </mesh>
+        <mesh position={[0, -1.05, 0.08]} rotation={[-Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.28, 0.28, 0.04, 32]} />
+          <meshStandardMaterial color="#111111" metalness={0.7} roughness={0.4} />
+        </mesh>
+        <mesh position={[0, 0.78, 0.06]}>
+          <boxGeometry args={[1.6, 0.04, 0.06]} />
+          <meshStandardMaterial
+            color="#f8fafc"
+            emissive="#fff7ed"
+            emissiveIntensity={1.2}
+          />
+        </mesh>
+        <mesh ref={glow} position={[0, 0.1, -0.55]}>
+          <circleGeometry args={[1.35, 48]} />
+          <meshStandardMaterial
+            color="#ff1f1f"
+            emissive="#ff1f1f"
+            emissiveIntensity={1.6}
+            transparent
+            opacity={0.85}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+        <mesh position={[0, 0.1, -0.58]}>
+          <circleGeometry args={[1.9, 48]} />
+          <meshStandardMaterial
+            color="#7f1d1d"
+            emissive="#991b1b"
+            emissiveIntensity={0.7}
+            transparent
+            opacity={0.35}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      </group>
+    );
+  }
 function Keyboard() {
   return (
     <group position={[0, 0.08, 0.55]}>
@@ -160,7 +263,19 @@ function Plant() {
   );
 }
 
-export function DeskWorkspace({ progress }: { progress: number }) {
+export function DeskWorkspace({
+  progress,
+  introDone,
+  reduced,
+  revealProgressRef,
+  portraitPositionRef,
+}: {
+  progress: number;
+  introDone: boolean;
+  reduced: boolean;
+  revealProgressRef: RevealProgress;
+  portraitPositionRef: PortraitPosition;
+}) {
   return (
     <group>
       {/* Desk */}
@@ -173,7 +288,13 @@ export function DeskWorkspace({ progress }: { progress: number }) {
         <planeGeometry args={[2.4, 1.1]} />
         <meshStandardMaterial color="#7c2d12" roughness={0.85} />
       </mesh>
-      <Monitor progress={progress} />
+      <Monitor
+        progress={progress}
+        introDone={introDone}
+        reduced={reduced}
+        revealProgressRef={revealProgressRef}
+        portraitPositionRef={portraitPositionRef}
+      />
       <Keyboard />
       <Mouse />
       <Plant />
