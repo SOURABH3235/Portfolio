@@ -76,9 +76,9 @@ function HeadMovement() {
       const current = currentFrame.current;
       const target = targetFrame.current;
 
-      if (Math.abs(current - target) > 0.1) {
+      if (Math.abs(current - target) > 0.05) {
         currentFrame.current +=
-          (target - current) * 0.12;
+          (target - current) * 0.15;
 
         setFrame(
           Math.round(currentFrame.current)
@@ -103,57 +103,58 @@ function HeadMovement() {
      frame_0072.png
   ----------------------------------------- */
 
-  const frameNumber = String(frame).padStart(4, "0");
+ const frameNumber = String(frame).padStart(4, "0");
 
-  return (
+return (
+  <div
+    className="
+      pointer-events-none
+      absolute
+      inset-0
+      z-[2]
+      flex
+      items-center
+      justify-center
+
+      md:justify-end
+      md:pr-[6%]
+    "
+  >
+    {/* HEAD MOVEMENT */}
+    <img
+      src={`/head_movement_frames_12fps/frame_${frameNumber}.png`}
+      alt="Sourabh"
+      draggable={false}
+      className="
+        pointer-events-none
+        h-[55%]
+        w-auto
+        object-contain
+
+        md:h-[65%]
+      "
+    />
+
+    {/* BLACK CIRCLE */}
     <div
       className="
         pointer-events-none
         absolute
-        inset-0
-        z-[2]
+        right-[8.6%]
+        bottom-[21%]
+        z-[3]
         flex
+        h-9
+        w-9
         items-center
         justify-center
-
-        md:justify-end
-        md:pr-[6%]
+        rounded-full
+        bg-black/87
+        shadow-[0_0_12px_rgba(0,0,0,0.8)]
       "
-    >
-      <img
-        src={`/head_movement_frames_12fps/frame_${frameNumber}.png`}
-        alt="Sourabh"
-        draggable={false}
-        className="
-          pointer-events-none
-          h-[55%]
-          w-auto
-          object-contain
-
-          md:h-[65%]
-        "
-      />
-      <div
-  className="
-    pointer-events-none
-    absolute
-    right-[8.6%]
-    bottom-[21%]
-    z-[3]
-    flex
-    h-9
-    w-9
-    items-center
-    justify-center
-    rounded-full
-    bg-black/87
-    shadow-[0_0_12px_rgba(0,0,0,0.8)]
-  "
->
-
-</div>
-    </div>
-  );
+    />
+  </div>
+);
 }
 
 /* =========================================
