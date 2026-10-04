@@ -27,48 +27,36 @@ gsap.registerPlugin(useGSAP);
 /* =========================================
    HEAD MOVEMENT
    ========================================= */
-
 function HeadMovement() {
+  const TOTAL_FRAMES = 240;
+
   const [frame, setFrame] = useState(1);
 
   const targetFrame = useRef(1);
   const currentFrame = useRef(1);
 
-  /* -----------------------------------------
-     CURSOR → FRAME
-  ----------------------------------------- */
-
+  // Cursor position → target frame
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       const x = e.clientX / window.innerWidth;
 
-      // Cursor left  -> frame 1
-      // Cursor right -> frame 72
-      const newFrame = Math.round(x * 71) + 1;
+      const newFrame =
+        Math.round(x * (TOTAL_FRAMES - 1)) + 1;
 
       targetFrame.current = Math.max(
         1,
-        Math.min(72, newFrame)
+        Math.min(TOTAL_FRAMES, newFrame)
       );
     };
 
-    window.addEventListener(
-      "mousemove",
-      handleMouseMove
-    );
+    window.addEventListener("mousemove", handleMouseMove);
 
     return () => {
-      window.removeEventListener(
-        "mousemove",
-        handleMouseMove
-      );
+      window.removeEventListener("mousemove", handleMouseMove);
     };
   }, []);
 
-  /* -----------------------------------------
-     SMOOTH FRAME MOVEMENT
-  ----------------------------------------- */
-
+  // Smooth frame transition
   useEffect(() => {
     let animationFrame: number;
 
@@ -78,83 +66,36 @@ function HeadMovement() {
 
       if (Math.abs(current - target) > 0.05) {
         currentFrame.current +=
-          (target - current) * 0.15;
+          (target - current) * 0.12;
 
-        setFrame(
-          Math.round(currentFrame.current)
-        );
+        setFrame(Math.round(currentFrame.current));
       }
 
-      animationFrame =
-        requestAnimationFrame(animate);
+      animationFrame = requestAnimationFrame(animate);
     };
 
-    animate();
+    animationFrame = requestAnimationFrame(animate);
 
-    return () =>
+    return () => {
       cancelAnimationFrame(animationFrame);
+    };
   }, []);
 
-  /* -----------------------------------------
-     FRAME NAME
-     frame_0001.png
-     frame_0002.png
-     ...
-     frame_0072.png
-  ----------------------------------------- */
+  const frameNumber = String(frame).padStart(4, "0");
 
- const frameNumber = String(frame).padStart(4, "0");
+  return (
+    <div className="pointer-events-none absolute inset-0 z-[2] flex items-center  overflow-hidden  rounded-[30px] justify-center md:justify-end md:pr-[6%]">
+      <img
+       src={`/head_movement_frames_12fps/head_movement_frames_24fps/frame_${frameNumber}.png`}
+        alt="Sourabh"
+        draggable={false}
+        className="pointer-events-none h-[55%] w-auto object-contain md:h-[65%]"
+      />
 
-return (
-  <div
-    className="
-      pointer-events-none
-      absolute
-      inset-0
-      z-[2]
-      flex
-      items-center
-      justify-center
-
-      md:justify-end
-      md:pr-[6%]
-    "
-  >
-    {/* HEAD MOVEMENT */}
-    <img
-      src={`/head_movement_frames_12fps/frame_${frameNumber}.png`}
-      alt="Sourabh"
-      draggable={false}
-      className="
-        pointer-events-none
-        h-[55%]
-        w-auto
-        object-contain
-
-        md:h-[65%]
-      "
-    />
-
-    {/* BLACK CIRCLE */}
-    <div
-      className="
-        pointer-events-none
-        absolute
-        right-[8.6%]
-        bottom-[21%]
-        z-[3]
-        flex
-        h-9
-        w-9
-        items-center
-        justify-center
-        rounded-full
-        bg-black/87
-        shadow-[0_0_12px_rgba(0,0,0,0.8)]
-      "
-    />
-  </div>
-);
+      {/* Gemini sign cover — if still needed */}
+      <div className="pointer-events-none absolute right-[8.6%] bottom-[21%] z-[3] h-9 w-9 rounded-full bg-black/87 shadow-[0_0_12px_rgba(0,0,0,0.8)]" />
+    </div>
+  );
 }
 
 /* =========================================
