@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
-import { RoundedBox, useTexture } from "@react-three/drei";
+import { useFrame, useLoader } from "@react-three/fiber";
+import { RoundedBox } from "@react-three/drei";
 import * as THREE from "three";
 
 type RevealProgress = { current: number };
 type PortraitPosition = { current: THREE.Vector3 };
+
+const TOTAL_FRAMES = 72;
 
 const portraitVertexShader = `
   varying vec2 vUv;
@@ -18,7 +20,6 @@ const portraitVertexShader = `
       projectionMatrix *
       modelViewMatrix *
       vec4(position, 1.0);
-  }
 `;
 
 const portraitFragmentShader = `
@@ -65,55 +66,116 @@ function PortraitReveal({
   revealProgressRef: RevealProgress;
   portraitPositionRef: PortraitPosition;
 }) {
-  const texture = useTexture("/my%20face.png");
+  /*
+   * Load all 72 frames.
+   *
+   * Files:
+   * public/head_movement_frames_12fps/frame_0001.png
+   * ...
+   * public/head_movement_frames_12fps/frame_0072.png
+   */
+  const frameUrls = useMemo(
+    () =>
+      Array.from(
+        { length: TOTAL_FRAMES },
+        (_, index) =>
+          `/head_movement_frames_12fps/frame_${String(
+            index + 1,
+          ).padStart(4, "0")}.png`,
+      ),
+    [],
+  );
+
+  const frames = useLoader(
+    THREE.TextureLoader,
+    frameUrls,
+  );
 
   const portrait = useRef<THREE.Group>(null);
-  const material = useRef<THREE.ShaderMaterial>(null);
-  const scanLine = useRef<THREE.Mesh>(null);
-  const scanMaterial = useRef<THREE.MeshBasicMaterial>(null);
-
-  // Cursor target rotation
-  const targetRotation = useRef({
-    x: 0,
-    y: 0,
-  });
-
-  // Current smooth rotation
-  const currentRotation = useRef({
-    x: 0,
-    y: 0,
-  });
+  const material =
+    useRef<THREE.ShaderMaterial>(null);
+  const scanLine =
+    useRef<THREE.Mesh>(null);
+  const scanMaterial =
+    useRef<THREE.MeshBasicMaterial>(null);
 
   /*
-   * Cursor / pointer tracking
-   *
-   * pointermove works with:
-   * - Mouse
-   * - Touch
-   * - Pen
+   * Target frame from cursor
+   */
+  const targetFrame = useRef(35);
+
+  /*
+   * Current smooth frame
+   */
+  const currentFrame = useRef(35);
+
+  /*
+   * Prevent unnecessary texture updates
+   */
+  const lastAppliedFrame = useRef(-1);
+
+  /*
+   * Cursor tracking
    */
   useEffect(() => {
-    const handlePointerMove = (event: PointerEvent) => {
-      const normalizedX =
-        (event.clientX / window.innerWidth) * 2 - 1;
-
-      const normalizedY =
-        (event.clientY / window.innerHeight) * 2 - 1;
+    const handlePointerMove = (
+      event: PointerEvent,
+    ) => {
+      if (
+        window.innerWidth <= 0
+      ) {
+        return;
+      }
 
       /*
-       * Small values are intentional.
-       * We don't want the portrait to rotate too much.
+       * Normalize cursor X:
+       *
+       * left   = -1
+       * center =  0
+       * right  = +1
        */
-      targetRotation.current.y =
-        normalizedX * 0.14;
+      const normalizedX =
+        (event.clientX /
+          window.innerWidth) *
+          2 -
+        1;
 
-      targetRotation.current.x =
-        -normalizedY * 0.09;
+      /*
+       * Clamp value
+       */
+      const x = THREE.MathUtils.clamp(
+        normalizedX,
+        -1,
+        1,
+      );
+
+      /*
+       * Convert cursor position
+       * into frame number.
+       *
+       * left  -> frame 1
+       * center -> frame 36
+       * right -> frame 72
+       */
+      const mappedFrame =
+        THREE.MathUtils.clamp(
+          Math.round(
+            ((x + 1) / 2) *
+              (TOTAL_FRAMES - 1),
+          ),
+          0,
+          TOTAL_FRAMES - 1,
+        );
+
+      targetFrame.current =
+        mappedFrame;
     };
 
     const handlePointerLeave = () => {
-      targetRotation.current.x = 0;
-      targetRotation.current.y = 0;
+      /*
+       * Return face to center
+       */
+      targetFrame.current = 35;
     };
 
     window.addEventListener(
@@ -140,11 +202,15 @@ function PortraitReveal({
     };
   }, []);
 
+  /*
+   * Use first frame to calculate image size.
+   */
   const imageSize = useMemo(() => {
-    const image = texture.image as {
-      width: number;
-      height: number;
-    };
+    const image =
+      frames[0].image as {
+        width: number;
+        height: number;
+      };
 
     const aspect =
       image.width / image.height;
@@ -158,7 +224,7 @@ function PortraitReveal({
       width: height * aspect,
       height,
     };
-  }, [texture]);
+  }, [frames]);
 
   const geometryArgs = useMemo(
     () =>
@@ -169,55 +235,76 @@ function PortraitReveal({
     [imageSize],
   );
 
+  /*
+   * Set correct color space
+   * for every frame.
+   */
+  useEffect(() => {
+    frames.forEach((texture) => {
+      texture.colorSpace =
+        THREE.SRGBColorSpace;
+
+      texture.needsUpdate = true;
+    });
+  }, [frames]);
+
+  /*
+   * Shader uniforms
+   */
   const uniforms = useMemo(
     () => ({
       uMap: {
-        value: texture,
+        value: frames[35],
       },
 
       uReveal: {
         value: 0,
       },
     }),
-    [texture],
+    [frames],
   );
-
-  useEffect(() => {
-    texture.colorSpace =
-      THREE.SRGBColorSpace;
-
-    texture.needsUpdate = true;
-  }, [texture]);
 
   useFrame(() => {
     /*
-     * Smooth cursor-follow rotation
+     * Smoothly move current frame
+     * toward cursor target.
+     */
+    currentFrame.current =
+      THREE.MathUtils.lerp(
+        currentFrame.current,
+        targetFrame.current,
+        0.16,
+      );
+
+    const frameIndex = THREE.MathUtils.clamp(
+      Math.round(
+        currentFrame.current,
+      ),
+      0,
+      TOTAL_FRAMES - 1,
+    );
+
+    /*
+     * Change texture only when
+     * frame actually changes.
+     */
+    if (
+      material.current &&
+      frameIndex !==
+        lastAppliedFrame.current
+    ) {
+      material.current.uniforms.uMap.value =
+        frames[frameIndex];
+
+      lastAppliedFrame.current =
+        frameIndex;
+    }
+
+    /*
+     * Keep portrait world position
+     * updated for CursorReveal.
      */
     if (portrait.current) {
-      currentRotation.current.x =
-        THREE.MathUtils.lerp(
-          currentRotation.current.x,
-          targetRotation.current.x,
-          0.08,
-        );
-
-      currentRotation.current.y =
-        THREE.MathUtils.lerp(
-          currentRotation.current.y,
-          targetRotation.current.y,
-          0.08,
-        );
-
-      portrait.current.rotation.x =
-        currentRotation.current.x;
-
-      portrait.current.rotation.y =
-        currentRotation.current.y;
-
-      /*
-       * Keep the world position reference updated
-       * for CursorReveal in HeroScene.
-       */
       portrait.current.getWorldPosition(
         portraitPositionRef.current,
       );
@@ -245,7 +332,7 @@ function PortraitReveal({
     }
 
     /*
-     * Existing scan line animation
+     * Existing red scan line
      */
     if (
       scanLine.current &&
@@ -278,6 +365,7 @@ function PortraitReveal({
       ref={portrait}
       position={[0, -0.04, 0.06]}
     >
+      {/* Face */}
       <mesh>
         <planeGeometry
           args={geometryArgs}
@@ -286,8 +374,12 @@ function PortraitReveal({
         <shaderMaterial
           ref={material}
           uniforms={uniforms}
-          vertexShader={portraitVertexShader}
-          fragmentShader={portraitFragmentShader}
+          vertexShader={
+            portraitVertexShader
+          }
+          fragmentShader={
+            portraitFragmentShader
+          }
           transparent
           depthWrite={false}
           side={THREE.DoubleSide}
@@ -318,7 +410,9 @@ function PortraitReveal({
           opacity={0}
           depthTest={false}
           depthWrite={false}
-          blending={THREE.AdditiveBlending}
+          blending={
+            THREE.AdditiveBlending
+          }
           toneMapped={false}
         />
       </mesh>
@@ -382,7 +476,7 @@ function Monitor({
         />
       </RoundedBox>
 
-      {/* Monitor screen */}
+      {/* Screen */}
       <mesh
         position={[
           0,
@@ -404,7 +498,7 @@ function Monitor({
         />
       </mesh>
 
-      {/* Face */}
+      {/* Head / face */}
       <PortraitReveal
         introDone={introDone}
         reduced={reduced}
@@ -515,7 +609,7 @@ function Monitor({
         />
       </mesh>
 
-      {/* Outer red glow */}
+      {/* Outer glow */}
       <mesh
         position={[
           0,
@@ -642,7 +736,6 @@ function Plant() {
         0.1,
       ]}
     >
-      {/* Pot */}
       <mesh>
         <cylinderGeometry
           args={[
@@ -658,7 +751,6 @@ function Plant() {
         />
       </mesh>
 
-      {/* Leaves */}
       {[0, 1, 2, 3].map(
         (i) => (
           <mesh
@@ -779,13 +871,10 @@ export function DeskWorkspace({
         }
       />
 
-      {/* Keyboard */}
       <Keyboard />
 
-      {/* Mouse */}
       <Mouse />
 
-      {/* Plant */}
       <Plant />
 
       {/* Soft wall */}
